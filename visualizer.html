@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Music Visualizer</title>
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        background: #000;
+        font-family: "Poppins", sans-serif;
+        overflow: hidden;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .container {
+        width: 94%;
+        height: 90vh;
+        display: flex;
+        gap: 25px;
+        position: relative;
+    }
+
+    .visual-box {
+        flex: 3;
+        border-radius: 22px;
+        background: rgba(255,255,255,0.05);
+        backdrop-filter: blur(12px);
+        overflow: hidden;
+        position: relative;
+    }
+
+    #mainCanvas {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .control-box {
+        flex: 1.3;
+        background: rgba(255,255,255,0.07);
+        border-radius: 22px;
+        padding: 25px;
+        overflow-y: auto;
+        backdrop-filter: blur(12px);
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+    }
+
+    input[type="file"] {
+        width: 100%;
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
+        background: #ff0077;
+        color: white;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .mode {
+        background: #4400ff;
+        border: none;
+        padding: 12px;
+        border-radius: 10px;
+        color: white;
+        font-size: 1.1rem;
+        cursor: pointer;
+        width: 100%;
+    }
+    .mode:hover {
+        background: #6600ff;
+    }
+
+    input[type="range"] {
+        width: 100%;
+        accent-color: #ff00cc;
+    }
+
+    .song-card {
+        background: rgba(255,255,255,0.08);
+        border-radius: 14px;
+        padding: 15px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 0 12px rgba(0,0,0,0.5);
+    }
+
+    .song-card img {
+        width: 60px;
+        height: 60px;
+        border-radius: 10px;
+        object-fit: cover;
+    }
+
+    .song-info h3 {
+        margin: 0;
+        font-size: 1.15rem;
+    }
+
+    .song-info p {
+        margin: 0;
+        font-size: 0.85rem;
+        opacity: 0.8;
+    }
+
+    /* ✅ Custom MP3 Player */
+    .player {
+        display: none;
+        align-items: center;
+        gap: 15px;
+        background: rgba(255,255,255,0.1);
+        padding: 12px 15px;
+        border-radius: 12px;
+        box-shadow: 0 0 14px rgba(0,0,0,0.4);
+    }
+
+    #playPauseBtn {
+        background: #00eaff;
+        border: none;
+        color: black;
+        font-size: 20px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    #seekBar {
+        flex: 1;
+        accent-color: #00ffae;
+    }
+
+    #volumeSlider {
+        width: 80px;
+        accent-color: #ff00c8;
+    }
+
+    .time {
+        font-size: 0.9rem;
+        opacity: 0.85;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="visual-box">
+        <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <div class="control-box">
+        <h2>Visualizer Modes</h2>
+
+        <button class="mode" data-mode="original">Original (Exact)</button>
+        <button class="mode" data-mode="bars">Mirrored Bars</button>
+        <button class="mode" data-mode="circle">Circle Ring</button>
+        <button class="mode" data-mode="timeline">Scrolling Wave</button>
+        <button class="mode" data-mode="pulse">Pulse Circle</button>
+        <button class="mode" data-mode="cube">3D Cubes</button>
+
+        <input type="file" id="fileInput" accept="audio/*">
+
+        <div id="songCard" style="display:none;" class="song-card">
+            <img id="albumArt">
+            <div class="song-info">
+                <h3 id="songName"></h3>
+                <p id="songArtist"></p>
+            </div>
+        </div>
+
+        <!-- ✅ Custom MP3 Player -->
+        <div class="player" id="player">
+            <button id="playPauseBtn">⏵</button>
+            <span id="currentTime">0:00</span>
+            <input type="range" id="seekBar" min="0" value="0" step="0.01">
+            <span id="duration">0:00</span>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
+        </div>
+
+        <label>Sensitivity</label>
+        <input type="range" id="sensitivity" min="0.1" max="5" step="0.1" value="3">
+
+        <label>Smoothness</label>
+        <input type="range" id="smooth" min="0" max="1" step="0.01" value="0.85">
+    </div>
+</div>
+
+<script>
+let audioContext, analyzer, dataArray, source, audio;
+let sensitivity = 3;
+let mode = "original";
+
+const canvas = document.getElementById("mainCanvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+    canvas.width = document.querySelector(".visual-box").clientWidth;
+    canvas.height = document.querySelector(".visual-box").clientHeight;
+}
+resizeCanvas();
+window.onresize = resizeCanvas;
+
+document.querySelectorAll(".mode").forEach(btn=>{
+    btn.onclick = ()=> mode = btn.dataset.mode;
+});
+
+document.getElementById("sensitivity").oninput = e =>
+    sensitivity = parseFloat(e.target.value);
+
+document.getElementById("smooth").oninput = e =>
+    analyzer ? analyzer.smoothingTimeConstant = parseFloat(e.target.value) : null;
+
+/* ✅ Load audio + custom player */
+document.getElementById("fileInput").onchange = function(){
+    const file = this.files[0];
+    if(!file) return;
+
+    const url = URL.createObjectURL(file);
+    if(audio) audio.pause();
+
+    audio = new Audio(url);
+
+    /* ✅ Show custom player */
+    document.getElementById("player").style.display = "flex";
+
+    setupPlayer(audio);
+    extractMetadata(file);
+
+    audioContext = new AudioContext();
+    analyzer = audioContext.createAnalyser();
+    analyzer.fftSize = 1024;
+    analyzer.smoothingTimeConstant = parseFloat(document.getElementById("smooth").value);
+
+    dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+    source = audioContext.createMediaElementSource(audio);
+    source.connect(analyzer);
+    analyzer.connect(audioContext.destination);
+
+    audio.play();
+    draw();
+};
+
+/* ✅ Custom player functions */
+function setupPlayer(audio){
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const seekBar = document.getElementById("seekBar");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const currentTimeEl = document.getElementById("currentTime");
+    const durationEl = document.getElementById("duration");
+
+    function format(sec){
+        const m = Math.floor(sec/60);
+        const s = Math.floor(sec%60).toString().padStart(2,"0");
+        return `${m}:${s}`;
+    }
+
+    audio.onloadedmetadata = ()=>{
+        seekBar.max = audio.duration;
+        durationEl.textContent = format(audio.duration);
+    };
+
+    audio.ontimeupdate = ()=>{
+        seekBar.value = audio.currentTime;
+        currentTimeEl.textContent = format(audio.currentTime);
+    };
+
+    seekBar.oninput = ()=> audio.currentTime = seekBar.value;
+    volumeSlider.oninput = ()=> audio.volume = volumeSlider.value;
+
+    playPauseBtn.onclick = ()=>{
+        if(audio.paused){
+            audio.play();
+            playPauseBtn.textContent = "⏸";
+        } else {
+            audio.pause();
+            playPauseBtn.textContent = "⏵";
+        }
+    };
+}
+
+/* ✅ Album art + Song Info */
+function extractMetadata(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+        const data = new Uint8Array(e.target.result);
+        let found = false;
+
+        for(let i=0;i<data.length-10;i++){
+            if(data[i]===0xFF && data[i+1]===0xD8){
+                let end=i;
+                while(end<data.length-1 && !(data[end]===0xFF && data[end+1]===0xD9)) end++;
+                if(end<data.length-1){
+                    const blob = new Blob([data.slice(i,end+2)],{type:"image/jpeg"});
+                    document.getElementById("albumArt").src = URL.createObjectURL(blob);
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        document.getElementById("songName").textContent = file.name;
+        document.getElementById("songArtist").textContent = found ? "Detected Album Art" : "No Art Found";
+        document.getElementById("songCard").style.display = "flex";
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+/* ✅ DRAW VISUALS */
+let timelineX = 0;
+
+function draw(){
+    requestAnimationFrame(draw);
+    if(!analyzer) return;
+
+    analyzer.getByteTimeDomainData(dataArray);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    if(mode==="original") drawOriginal();
+    if(mode==="bars") drawBars();
+    if(mode==="circle") drawCircle();
+    if(mode==="timeline") drawTimeline();
+    if(mode==="pulse") drawPulse();
+    if(mode==="cube") drawCube();
+}
+
+/* ✅ EXACT original mirrored bar mode */
+function drawOriginal(){
+    const centerX = canvas.width/2;
+    const centerY = canvas.height/2;
+
+    ctx.strokeStyle="rgba(255,255,255,0.2)";
+    ctx.beginPath();
+    ctx.moveTo(0,centerY);
+    ctx.lineTo(canvas.width,centerY);
+    ctx.stroke();
+
+    const half = dataArray.length/2;
+    const barWidth = 4;
+
+    for(let i=0;i<half;i++){
+        const v = dataArray[i]/128 - 1;
+        const h = v * (canvas.height/2) * sensitivity;
+        ctx.fillStyle="rgb(255,80,80)";
+
+        ctx.fillRect(centerX+(i*barWidth),
+            h>=0?centerY-h:centerY,
+            barWidth-1,
+            Math.abs(h));
+
+        ctx.fillRect(centerX-((i+1)*barWidth),
+            h>=0?centerY-h:centerY,
+            barWidth-1,
+            Math.abs(h));
+    }
+}
+
+/* ✅ Mode 2 */
+function drawBars(){
+    const mid = canvas.height/2;
+    const half = dataArray.length/2;
+    const barWidth = 4;
+
+    for(let i=0;i<half;i++){
+        const v = dataArray[i]/128 - 1;
+        const h = Math.abs(v*mid*sensitivity);
+        ctx.fillStyle=`hsl(${i*3},100%,60%)`;
+        ctx.fillRect(canvas.width/2+i*barWidth,mid,barWidth-1,h);
+        ctx.fillRect(canvas.width/2-(i+1)*barWidth,mid,barWidth-1,h);
+    }
+}
+
+/* ✅ Mode 3 */
+function drawCircle(){
+    const cx = canvas.width/2;
+    const cy = canvas.height/2;
+    const base = Math.min(canvas.width,canvas.height)/3;
+
+    for(let i=0;i<dataArray.length;i++){
+        const angle = (i/dataArray.length)*Math.PI*2;
+        const v=dataArray[i]/128 - 1;
+        const dist = base + v*120*sensitivity;
+        const x=cx+Math.cos(angle)*dist;
+        const y=cy+Math.sin(angle)*dist;
+        ctx.fillStyle=`hsl(${i*2},100%,60%)`;
+        ctx.beginPath();
+        ctx.arc(x,y,3,0,Math.PI*2);
+        ctx.fill();
+    }
+}
+
+/* ✅ Mode 4 */
+function drawTimeline(){
+    const mid = canvas.height/2;
+    ctx.strokeStyle="#00eaff";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(timelineX,mid);
+
+    for(let i=0;i<dataArray.length;i++){
+        const v=dataArray[i]/128 - 1;
+        const y=mid+v*120*sensitivity;
+        ctx.lineTo(timelineX,y);
+        timelineX++;
+        if(timelineX>canvas.width) timelineX=0;
+    }
+    ctx.stroke();
+}
+
+/* ✅ Mode 5 */
+function drawPulse(){
+    const avg = dataArray.reduce((a,b)=>a+b)/dataArray.length;
+    const r = avg*sensitivity;
+    ctx.beginPath();
+    ctx.arc(canvas.width/2,canvas.height/2,r,0,Math.PI*2);
+    ctx.strokeStyle="rgb(255,0,170)";
+    ctx.lineWidth=10;
+    ctx.stroke();
+}
+
+/* ✅ Mode 6 */
+function drawCube(){
+    const mid=canvas.height/2;
+    const barWidth=10;
+
+    for(let i=0;i<80;i++){
+        const v=dataArray[i]/128 - 1;
+        const h=Math.abs(v*mid*sensitivity);
+        const x=40+i*barWidth;
+        ctx.fillStyle=`hsl(${i*4},100%,50%)`;
+        ctx.fillRect(x,mid-h,barWidth-3,h);
+        ctx.fillStyle="rgba(255,255,255,0.2)";
+        ctx.fillRect(x-3,mid-h-12,barWidth,12);
+    }
+}
+</script>
+
+</body>
+</html>
