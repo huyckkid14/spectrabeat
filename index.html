@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SpectraBeat - Ultimate Music Visualizer</title>
+<style>
+    body {
+        margin: 0;
+        font-family: "Poppins", sans-serif;
+        background: radial-gradient(circle at center, #1a0033, #000011 60%, #000000);
+        color: white;
+        text-align: center;
+        overflow: hidden;
+        height: 100vh;
+    }
+
+    .center-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        max-width: 700px;
+        width: 90%;
+    }
+
+    h1 {
+        font-size: 4rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #ffffff;
+        text-shadow: 0 0 25px #9e5dff, 0 0 45px #6f2bff;
+    }
+
+    h2 {
+        font-size: 1.3rem;
+        opacity: 0.95;
+        color: #e6d9ff;
+        margin-bottom: 55px;
+    }
+
+    .start-btn {
+        background: #8a2bff;
+        padding: 18px 45px;
+        border: none;
+        border-radius: 50px;
+        font-size: 1.3rem;
+        color: white;
+        cursor: pointer;
+        display: inline-block;
+        transition: 0.2s;
+        box-shadow: 0 0 25px rgba(156,72,255,0.9);
+    }
+    .start-btn:hover {
+        transform: scale(1.08);
+        background: #b67bff;
+        box-shadow: 0 0 35px rgba(156,72,255,1);
+    }
+
+    .features {
+        margin: 45px auto;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 14px;
+    }
+
+    .feature-card {
+        background: rgba(255,255,255,0.12);
+        padding: 12px 20px;
+        border-radius: 14px;
+        backdrop-filter: blur(14px);
+        font-size: 1.1rem;
+        color: #ffffff;
+        min-width: 210px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid rgba(255,255,255,0.18);
+    }
+    
+    .note {
+        position: absolute;
+        opacity: 0.5;
+        animation: float 6.5s linear infinite;
+        user-select: none;
+        font-size: 22px;
+    }
+
+    @keyframes float {
+        0% { transform: translateY(105vh) rotate(0deg); opacity: 0; }
+        10% { opacity: 1; }
+        100% { transform: translateY(-15vh) rotate(360deg); opacity: 0; }
+    }
+</style>
+</head>
+
+<body>
+
+<script>
+// clear white space bug
+document.body.style.backgroundColor = "black";
+
+// floating music notes
+const icons = ["🎵","🎶","🎧","🔊","🎹","💿","🥁"];
+for(let i=0;i<22;i++){
+    const n = document.createElement("div");
+    n.className = "note";
+    n.textContent = icons[Math.floor(Math.random()*icons.length)];
+    n.style.left = Math.random()*100 + "vw";
+    n.style.animationDuration = (6 + Math.random()*5) + "s";
+    n.style.fontSize = (18 + Math.random()*26) + "px";
+    document.body.appendChild(n);
+}
+</script>
+
+<div class="center-box">
+    <h1>SpectraBeat</h1>
+    <h2>Upload a song. Watch it explode into color, sound and motion.</h2>
+
+    <button class="start-btn" onclick="location.href='visualizer.html'">
+        Start Visualizer
+    </button>
+
+    <div class="features">
+        <div class="feature-card">✅ 100% Free</div>
+        <div class="feature-card">🚫 No Ads</div>
+        <div class="feature-card">🔒 No Accounts / No Premium</div>
+        <div class="feature-card">💻 100% Local – nothing uploaded</div>
+    </div>
+</div>
+
+</body>
+</html>
